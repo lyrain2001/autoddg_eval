@@ -45,9 +45,11 @@ pip install streamlit pandas
 
 ### 1. Download Sample Data
 
-**Two sample datasets are available via Google Drive:**
+**Two sample datasets are provided for evaluation:**
 - `ntcir_sampled/` - Sample NTCIR datasets (36 tables)
 - `ECIR_sampled/` - Sample ECIR datasets (12 tables)
+
+**Your task is to evaluate the descriptions for these two datasets.**
 
 **📥 [Download ntcir and ECIR datasets from Google Drive](https://drive.google.com/drive/folders/16Tyqqj-LPd43n5ofjMV8jnvYo4XLUtXQ?usp=sharing)**
 
@@ -55,7 +57,7 @@ After downloading:
 1. Extract the folders
 2. Place them in the same directory as `streamlit_app.py`
 
-These are already in the correct format and ready to use. You can start evaluating immediately with these samples!
+These are already in the correct format and ready to use. You can start evaluating immediately!
 
 ### 2. Folder Structure
 
@@ -66,9 +68,10 @@ project_folder/
 ├── streamlit_app.py         # The Streamlit app file
 ├── ntcir_sampled/           # Sample NTCIR dataset (36 tables)
 ├── ECIR_sampled/            # Sample ECIR dataset (12 tables)
-├── YourDatasets/            # Your custom datasets folder
+├── YourDatasets/            # Your custom datasets folder (optional)
 │   ├── dataset_1/
 │   │   ├── data.csv         # Your dataset (any .csv file)
+│   │   ├── title.txt        # Dataset title (optional)
 │   │   ├── data_profiler.txt    # Dataset statistics (optional)
 │   │   ├── gpt_ufd.txt      # Description to evaluate
 │   │   ├── gpt_sfd.txt      # Another description to evaluate
@@ -86,6 +89,7 @@ project_folder/
   - `gpt_ufd.txt` - Description type 1
   - `gpt_sfd.txt` - Description type 2
   - `original.txt` - Description type 3
+- **Optional**: `title.txt` - Dataset title
 - **Optional**: `data_profiler.txt` - Statistical summary
 
 **Note**: You can have any combination of the three description types.
@@ -114,6 +118,7 @@ Your browser will open to `http://localhost:8501`.
 ### 3. Interface Overview
 
 **Left Panel - Reference Data:**
+- **Dataset Title**: Display of the dataset title (if available)
 - **📊 Table Data**: View the actual CSV dataset (scroll to see all data)
 - **📈 Statistics**: View statistical summaries
 - **Evaluation Criteria**: Quick reference for scoring
@@ -122,6 +127,7 @@ Your browser will open to `http://localhost:8501`.
 **Right Panel - Evaluation:**
 - Description text
 - Four scoring sliders (1-10 for each criterion)
+- Comment box (optional)
 - Save button and navigation
 
 **Sidebar:**
@@ -132,15 +138,16 @@ Your browser will open to `http://localhost:8501`.
 ### 4. Evaluating Descriptions
 
 1. **Read the instructions** (expandable section at top)
-2. **Review the dataset** in the left panel (Table Data tab)
+2. **Review the dataset title and data** in the left panel
 3. **Read the description** on the right panel
 4. **Score each criterion** using the sliders (1-10):
    - **Completeness**: Coverage of essential aspects
    - **Conciseness**: Efficiency without redundancy
    - **Readability**: Logical flow
    - **Faithfulness**: Accuracy without errors
-5. **Click "💾 Save Scores"** (wait for confirmation)
-6. **Navigate** using Next/Previous or sidebar dropdowns
+5. **Add comments** (optional): Note any specific issues or observations
+6. **Click "💾 Save Scores"** (wait for confirmation)
+7. **Navigate** using Next/Previous or sidebar dropdowns
 
 ### 5. Navigation
 
@@ -201,12 +208,13 @@ Accuracy in representing the dataset's actual content.
 - `conciseness` - Score (1-10)
 - `readability` - Score (1-10)
 - `faithfulness` - Score (1-10)
+- `comment` - Optional comments about the description
 
 **Example:**
 ```csv
-dataset_name,dataset_path,description_type,completeness,conciseness,readability,faithfulness
-traffic_safety,./ntcir_sampled/traffic_safety,gpt_ufd,7,9,8,9
-traffic_safety,./ntcir_sampled/traffic_safety,gpt_sfd,8,8,9,8
+dataset_name,dataset_path,description_type,completeness,conciseness,readability,faithfulness,comment
+traffic_safety,./ntcir_sampled/traffic_safety,gpt_ufd,7,9,8,9,"Missing temporal coverage"
+traffic_safety,./ntcir_sampled/traffic_safety,gpt_sfd,8,8,9,8,""
 ```
 
 **Download**: Use the "📥 Download Evaluations" button in sidebar anytime.
@@ -233,7 +241,7 @@ traffic_safety,./ntcir_sampled/traffic_safety,gpt_sfd,8,8,9,8
 
 ### Can't see all data
 - Use scrollbars (horizontal for columns, vertical for rows)
-- Table displays all data - scrolling is expected
+- Table displays first 1,000 rows for large datasets
 
 ### App won't start
 ```bash
@@ -244,12 +252,13 @@ pip install --upgrade streamlit pandas
 
 ## 💡 Tips
 
-1. **Start with provided datasets**: Download and try `ntcir_sampled` or `ECIR_sampled` first!
+1. **Start with provided datasets**: Download and evaluate `ntcir_sampled` and `ECIR_sampled`!
 2. **Read instructions first**: Review the expandable instruction box at the top
 3. **Use examples**: Check example evaluations to calibrate your scoring
-4. **Cross-reference**: Always compare description with actual CSV data
+4. **Cross-reference**: Always compare description with actual CSV data and title
 5. **Save frequently**: Don't forget to save after each evaluation
 6. **Be consistent**: Apply the same standards across all evaluations
 7. **Check statistics**: Use data profiler stats to verify accuracy
-8. **Take breaks**: Maintain evaluation quality by avoiding fatigue
-9. **Backup regularly**: Download CSV periodically
+8. **Use comments**: Note specific issues in the comment box
+9. **Take breaks**: Maintain evaluation quality by avoiding fatigue
+10. **Backup regularly**: Download CSV periodically

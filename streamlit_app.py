@@ -38,6 +38,15 @@ st.markdown("""
         border: 1px solid #bfdbfe;
         margin-bottom: 1rem;
     }
+    .title-box {
+        background-color: #e0f2fe;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        border-left: 4px solid #0284c7;
+        margin-bottom: 1rem;
+        font-size: 1.1rem;
+        color: #0c4a6e;
+    }
     .description-box {
         background-color: #ffffff;
         padding: 1.5rem;
@@ -79,7 +88,8 @@ def load_datasets(datasets_path):
             'name': dataset_folder,
             'path': folder_path,
             'csv_files': [],
-            'descriptions': {}
+            'descriptions': {},
+            'title': None
         }
         
         # Find CSV files and description files
@@ -91,6 +101,9 @@ def load_datasets(datasets_path):
             elif file == 'data_profiler.txt':
                 with open(file_path, 'r', encoding='utf-8') as f:
                     dataset_info['stats'] = f.read()
+            elif file == 'title.txt':
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    dataset_info['title'] = f.read().strip()
             elif file in ['gpt_ufd.txt', 'gpt_sfd.txt', 'original.txt']:
                 desc_type = file.replace('.txt', '')
                 with open(file_path, 'r', encoding='utf-8') as f:
@@ -106,17 +119,29 @@ def load_evaluations():
     """Load saved evaluations from CSV file"""
     if os.path.exists(EVALUATIONS_FILE):
         df = pd.read_csv(EVALUATIONS_FILE)
-        # Ensure dataset_path column exists for backwards compatibility
+        # Ensure required columns exist for backwards compatibility
         if 'dataset_path' not in df.columns:
             df['dataset_path'] = ''
+        if 'comment' not in df.columns:
+            df['comment'] = ''
+        else:
+            # Restore newlines from placeholders
+            df['comment'] = df['comment'].apply(
+                lambda x: str(x).replace('\\n', '\n').replace('\\r', '\r') if pd.notna(x) and x != 'nan' else ''
+            )
         return df
     else:
         # Create empty DataFrame with proper columns
-        return pd.DataFrame(columns=['dataset_name', 'dataset_path', 'description_type', 'completeness', 'conciseness', 'readability', 'faithfulness'])
+        return pd.DataFrame(columns=['dataset_name', 'dataset_path', 'description_type', 'completeness', 'conciseness', 'readability', 'faithfulness', 'comment'])
 
 def save_evaluations(evaluations_df):
     """Save evaluations to CSV file"""
-    evaluations_df.to_csv(EVALUATIONS_FILE, index=False)
+    # Replace newlines in comments with a placeholder to preserve CSV structure
+    if 'comment' in evaluations_df.columns:
+        evaluations_df['comment'] = evaluations_df['comment'].apply(
+            lambda x: str(x).replace('\n', '\\n').replace('\r', '\\r') if pd.notna(x) else ''
+        )
+    evaluations_df.to_csv(EVALUATIONS_FILE, index=False, quoting=1)  # quoting=1 means QUOTE_ALL
 
 def get_evaluation_scores(evaluations_df, dataset_name, description_type):
     """Get scores for a specific dataset and description type"""
@@ -130,13 +155,18 @@ def get_evaluation_scores(evaluations_df, dataset_name, description_type):
             'completeness': row.iloc[0]['completeness'] if pd.notna(row.iloc[0]['completeness']) else None,
             'conciseness': row.iloc[0]['conciseness'] if pd.notna(row.iloc[0]['conciseness']) else None,
             'readability': row.iloc[0]['readability'] if pd.notna(row.iloc[0]['readability']) else None,
-            'faithfulness': row.iloc[0]['faithfulness'] if pd.notna(row.iloc[0]['faithfulness']) else None
+            'faithfulness': row.iloc[0]['faithfulness'] if pd.notna(row.iloc[0]['faithfulness']) else None,
+            'comment': row.iloc[0]['comment'] if pd.notna(row.iloc[0]['comment']) else ''
         }
-    return {'completeness': None, 'conciseness': None, 'readability': None, 'faithfulness': None}
+    return {'completeness': None, 'conciseness': None, 'readability': None, 'faithfulness': None, 'comment': ''}
 
 def get_current_score_key(dataset_name, description_type, criterion):
     """Generate key for current scores"""
     return f"score_{dataset_name}_{description_type}_{criterion}"
+
+def get_current_comment_key(dataset_name, description_type):
+    """Generate key for current comment"""
+    return f"comment_{dataset_name}_{description_type}"
 
 def initialize_scores_for_description(dataset_name, description_type, saved_scores):
     """Initialize scores in session state for current description"""
@@ -148,6 +178,11 @@ def initialize_scores_for_description(dataset_name, description_type, saved_scor
                 st.session_state[key] = int(saved_scores[criterion])
             else:
                 st.session_state[key] = 5
+    
+    # Initialize comment
+    comment_key = get_current_comment_key(dataset_name, description_type)
+    if comment_key not in st.session_state:
+        st.session_state[comment_key] = saved_scores.get('comment', '')
 
 def save_current_scores(evaluations_df, dataset_name, dataset_path, description_type):
     """Save current scores from session state to DataFrame"""
@@ -157,6 +192,10 @@ def save_current_scores(evaluations_df, dataset_name, dataset_path, description_
         if key in st.session_state:
             scores[criterion] = st.session_state[key]
     
+    # Get comment
+    comment_key = get_current_comment_key(dataset_name, description_type)
+    comment = st.session_state.get(comment_key, '')
+    
     # Check if row exists
     mask = (evaluations_df['dataset_name'] == dataset_name) & (evaluations_df['description_type'] == description_type)
     
@@ -164,8 +203,8 @@ def save_current_scores(evaluations_df, dataset_name, dataset_path, description_
         # Update existing row
         for criterion, score in scores.items():
             evaluations_df.loc[mask, criterion] = score
-        # Also update dataset_path in case it changed
         evaluations_df.loc[mask, 'dataset_path'] = dataset_path
+        evaluations_df.loc[mask, 'comment'] = comment
     else:
         # Create new row
         new_row = {
@@ -175,7 +214,8 @@ def save_current_scores(evaluations_df, dataset_name, dataset_path, description_
             'completeness': scores.get('completeness', None),
             'conciseness': scores.get('conciseness', None),
             'readability': scores.get('readability', None),
-            'faithfulness': scores.get('faithfulness', None)
+            'faithfulness': scores.get('faithfulness', None),
+            'comment': comment
         }
         evaluations_df = pd.concat([evaluations_df, pd.DataFrame([new_row])], ignore_index=True)
     
@@ -332,6 +372,7 @@ def main():
         ├── dataset_name_1/
         │   ├── file.csv
         │   ├── data_profiler.txt
+        │   ├── title.txt
         │   ├── gpt_ufd.txt
         │   ├── gpt_sfd.txt
         │   └── original.txt
@@ -383,19 +424,36 @@ def main():
     with left_col:
         st.subheader("📋 Reference Data")
         
+        # Display dataset title if available - RIGHT HERE UNDER "Reference Data"
+        if current_dataset.get('title'):
+            st.markdown(f'<div class="title-box">📌 <strong>Dataset Title:</strong> {current_dataset["title"]}</div>', unsafe_allow_html=True)
+        
         # View mode tabs
         tab1, tab2 = st.tabs(["📊 Table Data", "📈 Statistics"])
         
         with tab1:
-            # Display CSV
+            # Display CSV - limit rows to avoid memory issues
             if current_dataset['csv_files']:
                 csv_file = current_dataset['csv_files'][0]
                 csv_path = os.path.join(current_dataset['path'], csv_file)
                 
                 try:
-                    df = pd.read_csv(csv_path)
-                    st.dataframe(df, use_container_width=True, height=400)
-                    st.caption(f"Showing: {csv_file} ({len(df)} rows × {len(df.columns)} columns)")
+                    # Read only first 5000 rows to avoid MessageSizeError
+                    df = pd.read_csv(csv_path, nrows=5000)
+                    
+                    # Try to count total rows efficiently
+                    try:
+                        with open(csv_path, 'r') as f:
+                            total_rows = sum(1 for _ in f) - 1  # minus header
+                    except:
+                        total_rows = len(df)
+                    
+                    st.dataframe(df, use_container_width=True, height=600)
+                    
+                    if total_rows > 5000:
+                        st.caption(f"Showing: {csv_file} (first 5,000 of {total_rows:,} rows × {len(df.columns)} columns)")
+                    else:
+                        st.caption(f"Showing: {csv_file} ({total_rows:,} rows × {len(df.columns)} columns)")
                 except Exception as e:
                     st.error(f"Error loading CSV: {e}")
         
@@ -405,7 +463,7 @@ def main():
                 st.text_area(
                     "Data Profiler Statistics",
                     value=current_dataset['stats'],
-                    height=400,
+                    height=600,
                     disabled=True
                 )
             else:
@@ -450,7 +508,7 @@ def main():
     with right_col:
         st.subheader("📝 Description to Evaluate")
         
-        # Display description without the box styling
+        # Display description
         st.markdown(current_description)
         
         # Evaluation form
@@ -464,10 +522,6 @@ def main():
             col_slider, col_num = st.columns([4, 1])
             
             with col_slider:
-                # Slider - only set value if key doesn't exist yet
-                if score_key not in st.session_state:
-                    st.session_state[score_key] = st.session_state[score_key]
-                
                 st.slider(
                     f"{criterion}_slider",
                     min_value=1,
@@ -483,6 +537,18 @@ def main():
             
             st.caption("1 (Lowest) ← → 10 (Highest)")
             st.markdown("---")
+        
+        # Comment box
+        st.markdown("### 💬 Comments (Optional)")
+        comment_key = get_current_comment_key(current_dataset['name'], current_desc_type)
+        st.text_area(
+            "Add any comments or notes about this description:",
+            value=st.session_state.get(comment_key, ''),
+            key=comment_key,
+            height=100,
+            placeholder="e.g., Missing temporal coverage info, contains factual errors in column names...",
+            on_change=lambda: setattr(st.session_state, 'unsaved_changes', True)
+        )
         
         # Save button
         col_save1, col_save2 = st.columns([1, 1])
