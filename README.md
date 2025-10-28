@@ -75,7 +75,8 @@ project_folder/
 │   │   ├── data_profiler.txt    # Dataset statistics (optional)
 │   │   ├── gpt_ufd.txt      # Description to evaluate
 │   │   ├── gpt_sfd.txt      # Another description to evaluate
-│   │   └── original.txt     # Another description to evaluate
+│   │   ├── original.txt     # Another description to evaluate
+│   │   └── llm_only.txt     # Another description to evaluate
 │   ├── dataset_2/
 │   │   └── ...
 ```
@@ -89,10 +90,11 @@ project_folder/
   - `gpt_ufd.txt` - Description type 1
   - `gpt_sfd.txt` - Description type 2
   - `original.txt` - Description type 3
+  - `llm_only.txt` - Description type 4
 - **Optional**: `title.txt` - Dataset title
 - **Optional**: `data_profiler.txt` - Statistical summary
 
-**Note**: You can have any combination of the three description types.
+**Note**: You can have any combination of the description types.
 
 ---
 
@@ -106,14 +108,21 @@ streamlit run streamlit_app.py
 
 Your browser will open to `http://localhost:8501`.
 
-### 2. Load Datasets
+### 2. Select Description Methods
 
-1. Open the **left sidebar**
+On the startup screen:
+1. **Select which description types to evaluate** by checking the boxes:
+   - GPT UFD
+   - GPT SFD
+   - Original
+   - LLM Only
 2. Enter the path to your datasets folder:
    - `./ntcir_sampled` (for sample data)
    - `./ECIR_sampled` (for sample data)
    - `./YourDatasets` (for your own data)
-3. Click **"🔄 Load/Reload Datasets"**
+3. Click **"🚀 Load Datasets and Start"**
+
+**Note**: Only the selected description types will be loaded and evaluated. You can restart and change your selection anytime using the "🔄 Restart & Change Methods" button.
 
 ### 3. Interface Overview
 
@@ -131,6 +140,7 @@ Your browser will open to `http://localhost:8501`.
 - Save button and navigation
 
 **Sidebar:**
+- Selected methods display
 - Progress tracker
 - Quick navigation dropdown
 - Download evaluations button
@@ -203,7 +213,7 @@ Accuracy in representing the dataset's actual content.
 **Columns:**
 - `dataset_name` - Dataset folder name
 - `dataset_path` - Full path to dataset folder
-- `description_type` - Which description (gpt_ufd, gpt_sfd, original)
+- `description_type` - Which description (gpt_ufd, gpt_sfd, original, llm_only)
 - `completeness` - Score (1-10)
 - `conciseness` - Score (1-10)
 - `readability` - Score (1-10)
@@ -228,11 +238,13 @@ traffic_safety,./ntcir_sampled/traffic_safety,gpt_sfd,8,8,9,8,""
 - Verify folder structure matches expected format
 - Ensure each dataset has at least one .csv and one .txt description file
 - Make sure you downloaded and extracted the sample datasets from Google Drive
+- Verify at least one selected description type exists in your datasets
 
 ### Description not showing
-- File must be exactly named: `gpt_ufd.txt`, `gpt_sfd.txt`, or `original.txt`
+- File must be exactly named: `gpt_ufd.txt`, `gpt_sfd.txt`, `original.txt`, or `llm_only.txt`
 - Names are case-sensitive
-- App only shows available descriptions
+- App only shows descriptions that were selected at startup
+- Use "🔄 Restart & Change Methods" to select different description types
 
 ### Scores not saving
 - Always click "💾 Save Scores" button
@@ -241,7 +253,7 @@ traffic_safety,./ntcir_sampled/traffic_safety,gpt_sfd,8,8,9,8,""
 
 ### Can't see all data
 - Use scrollbars (horizontal for columns, vertical for rows)
-- Table displays first 1,000 rows for large datasets
+- Table displays first 5,000 rows for large datasets
 
 ### App won't start
 ```bash
@@ -253,12 +265,13 @@ pip install --upgrade streamlit pandas
 ## 💡 Tips
 
 1. **Start with provided datasets**: Download and evaluate `ntcir_sampled` and `ECIR_sampled`!
-2. **Read instructions first**: Review the expandable instruction box at the top
-3. **Use examples**: Check example evaluations to calibrate your scoring
-4. **Cross-reference**: Always compare description with actual CSV data and title
-5. **Save frequently**: Don't forget to save after each evaluation
-6. **Be consistent**: Apply the same standards across all evaluations
-7. **Check statistics**: Use data profiler stats to verify accuracy
-8. **Use comments**: Note specific issues in the comment box
-9. **Take breaks**: Maintain evaluation quality by avoiding fatigue
-10. **Backup regularly**: Download CSV periodically
+2. **Select only needed methods**: Choose only the description types you want to evaluate to save time
+3. **Read instructions first**: Review the expandable instruction box at the top
+4. **Use examples**: Check example evaluations to calibrate your scoring
+5. **Cross-reference**: Always compare description with actual CSV data and title
+6. **Save frequently**: Don't forget to save after each evaluation
+7. **Be consistent**: Apply the same standards across all evaluations
+8. **Check statistics**: Use data profiler stats to verify accuracy
+9. **Use comments**: Note specific issues in the comment box
+10. **Take breaks**: Maintain evaluation quality by avoiding fatigue
+11. **Backup regularly**: Download CSV periodically
