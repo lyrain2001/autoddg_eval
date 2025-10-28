@@ -58,11 +58,18 @@ st.markdown("""
     .stButton > button {
         width: 100%;
     }
+    .method-selection-box {
+        background-color: #f0fdf4;
+        padding: 1.5rem;
+        border-radius: 0.5rem;
+        border: 2px solid #86efac;
+        margin-bottom: 1.5rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # Constants
-DESCRIPTION_TYPES = ['gpt_ufd', 'gpt_sfd', 'original']
+ALL_DESCRIPTION_TYPES = ['gpt_ufd', 'gpt_sfd', 'original', 'llm_only']
 CRITERIA = {
     'completeness': 'Completeness (1-10): Coverage of scope, statistics, and applications',
     'conciseness': 'Conciseness (1-10): Efficiency without redundancy',
@@ -71,7 +78,7 @@ CRITERIA = {
 }
 EVALUATIONS_FILE = 'evaluations.csv'
 
-def load_datasets(datasets_path):
+def load_datasets(datasets_path, selected_methods):
     """Load all datasets from the specified path"""
     datasets = []
     
@@ -104,12 +111,14 @@ def load_datasets(datasets_path):
             elif file == 'title.txt':
                 with open(file_path, 'r', encoding='utf-8') as f:
                     dataset_info['title'] = f.read().strip()
-            elif file in ['gpt_ufd.txt', 'gpt_sfd.txt', 'original.txt']:
+            elif file in [f'{method}.txt' for method in ALL_DESCRIPTION_TYPES]:
                 desc_type = file.replace('.txt', '')
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    dataset_info['descriptions'][desc_type] = f.read()
+                # Only load if this method is selected
+                if desc_type in selected_methods:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        dataset_info['descriptions'][desc_type] = f.read()
         
-        # Only add datasets that have all required files
+        # Only add datasets that have at least one selected description
         if dataset_info['csv_files'] and len(dataset_info['descriptions']) > 0:
             datasets.append(dataset_info)
     
@@ -221,16 +230,16 @@ def save_current_scores(evaluations_df, dataset_name, dataset_path, description_
     
     return evaluations_df
 
-def calculate_progress(datasets, evaluations_df):
+def calculate_progress(datasets, evaluations_df, selected_methods):
     """Calculate completion percentage"""
     if not datasets:
         return 0
     
-    total = len(datasets) * len(DESCRIPTION_TYPES) * len(CRITERIA)
+    total = len(datasets) * len(selected_methods) * len(CRITERIA)
     completed = 0
     
     for dataset in datasets:
-        for desc_type in DESCRIPTION_TYPES:
+        for desc_type in selected_methods:
             if desc_type in dataset['descriptions']:
                 scores = get_evaluation_scores(evaluations_df, dataset['name'], desc_type)
                 for criterion in CRITERIA.keys():
@@ -243,6 +252,80 @@ def is_description_complete(dataset_name, description_type, evaluations_df):
     """Check if all criteria are rated for a description"""
     scores = get_evaluation_scores(evaluations_df, dataset_name, description_type)
     return all(scores[criterion] is not None for criterion in CRITERIA.keys())
+
+def show_method_selection():
+    """Show method selection interface"""
+    st.markdown('<div class="main-header">📊 Dataset Description Evaluation</div>', unsafe_allow_html=True)
+    st.markdown("---")
+    
+    st.markdown('<div class="method-selection-box">', unsafe_allow_html=True)
+    st.markdown("### 🎯 Step 1: Select Description Methods to Evaluate")
+    st.markdown("Choose which description types you want to evaluate. Only the selected methods will be loaded.")
+    
+    # Create columns for checkboxes
+    cols = st.columns(4)
+    method_labels = {
+        'gpt_ufd': 'GPT UFD',
+        'gpt_sfd': 'GPT SFD',
+        'original': 'Original',
+        'llm_only': 'LLM Only'
+    }
+    
+    selected_methods = []
+    for idx, method in enumerate(ALL_DESCRIPTION_TYPES):
+        with cols[idx]:
+            if st.checkbox(method_labels[method], value=True, key=f"method_{method}"):
+                selected_methods.append(method)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Dataset path configuration
+    st.markdown("### 📁 Step 2: Configure Dataset Path")
+    datasets_path = st.text_input(
+        "Datasets folder path:",
+        value=st.session_state.get('datasets_path', './Datasets'),
+        help="Path to the folder containing dataset subfolders"
+    )
+    
+    # Start button
+    st.markdown("### ▶️ Step 3: Start Evaluation")
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col2:
+        if st.button("🚀 Load Datasets and Start", type="primary", use_container_width=True):
+            if not selected_methods:
+                st.error("⚠️ Please select at least one description method!")
+            else:
+                st.session_state.datasets_path = datasets_path
+                st.session_state.selected_methods = selected_methods
+                st.session_state.datasets = load_datasets(datasets_path, selected_methods)
+                st.session_state.current_dataset_idx = 0
+                st.session_state.current_desc_idx = 0
+                st.session_state.evaluation_started = True
+                
+                if not st.session_state.datasets:
+                    st.error(f"⚠️ No datasets found in {datasets_path} with the selected methods!")
+                else:
+                    st.success(f"✅ Loaded {len(st.session_state.datasets)} datasets with {len(selected_methods)} method(s)")
+                    st.rerun()
+    
+    # Show info box
+    st.markdown("---")
+    st.info("""
+    **Expected Folder Structure:**
+    ```
+    Datasets/
+    ├── dataset_name_1/
+    │   ├── file.csv
+    │   ├── data_profiler.txt
+    │   ├── title.txt
+    │   ├── gpt_ufd.txt
+    │   ├── gpt_sfd.txt
+    │   ├── original.txt
+    │   └── llm_only.txt
+    ├── dataset_name_2/
+    │   └── ...
+    ```
+    """)
 
 def main():
     # Initialize session state
@@ -260,11 +343,24 @@ def main():
         st.session_state.last_saved = None
     if 'unsaved_changes' not in st.session_state:
         st.session_state.unsaved_changes = False
+    if 'evaluation_started' not in st.session_state:
+        st.session_state.evaluation_started = False
+    if 'selected_methods' not in st.session_state:
+        st.session_state.selected_methods = ALL_DESCRIPTION_TYPES.copy()
+    
+    # Show method selection screen if not started
+    if not st.session_state.evaluation_started:
+        show_method_selection()
+        return
     
     # Header
     col1, col2 = st.columns([3, 1])
     with col1:
         st.markdown('<div class="main-header">📊 Dataset Description Evaluation</div>', unsafe_allow_html=True)
+    with col2:
+        if st.button("🔄 Restart & Change Methods", type="secondary"):
+            st.session_state.evaluation_started = False
+            st.rerun()
     
     # Show instructions at the top (collapsible)
     with st.expander("📋 **Evaluation Instructions** - Click to expand", expanded=False):
@@ -299,27 +395,24 @@ def main():
     with st.sidebar:
         st.header("⚙️ Configuration")
         
-        datasets_path = st.text_input(
-            "Datasets folder path:",
-            value=st.session_state.datasets_path,
-            help="Path to the folder containing dataset subfolders"
-        )
+        # Show selected methods
+        st.markdown("**Selected Methods:**")
+        for method in st.session_state.selected_methods:
+            st.markdown(f"✓ {method.upper()}")
         
-        if st.button("🔄 Load/Reload Datasets"):
-            st.session_state.datasets_path = datasets_path
-            st.session_state.datasets = load_datasets(datasets_path)
-            st.session_state.current_dataset_idx = 0
-            st.session_state.current_desc_idx = 0
-            st.rerun()
+        st.markdown("---")
         
         if not st.session_state.datasets:
-            st.warning("No datasets loaded. Please specify a valid path and click Load.")
-            st.info(f"Looking for datasets in: {datasets_path}")
+            st.warning("No datasets loaded.")
         else:
             st.success(f"✅ Loaded {len(st.session_state.datasets)} datasets")
             
             # Progress
-            progress = calculate_progress(st.session_state.datasets, st.session_state.evaluations)
+            progress = calculate_progress(
+                st.session_state.datasets, 
+                st.session_state.evaluations,
+                st.session_state.selected_methods
+            )
             st.metric("Progress", f"{progress}%")
             st.progress(progress / 100)
             
@@ -342,8 +435,8 @@ def main():
             
             selected_desc = st.selectbox(
                 "Jump to description:",
-                options=range(len(DESCRIPTION_TYPES)),
-                format_func=lambda x: DESCRIPTION_TYPES[x].upper(),
+                options=range(len(st.session_state.selected_methods)),
+                format_func=lambda x: st.session_state.selected_methods[x].upper(),
                 index=st.session_state.current_desc_idx
             )
             
@@ -364,27 +457,12 @@ def main():
     
     # Main content
     if not st.session_state.datasets:
-        st.info("👈 Please load datasets using the sidebar configuration.")
-        st.markdown("""
-        ### Expected Folder Structure:
-        ```
-        Datasets/
-        ├── dataset_name_1/
-        │   ├── file.csv
-        │   ├── data_profiler.txt
-        │   ├── title.txt
-        │   ├── gpt_ufd.txt
-        │   ├── gpt_sfd.txt
-        │   └── original.txt
-        ├── dataset_name_2/
-        │   └── ...
-        ```
-        """)
+        st.info("No datasets loaded with the selected methods.")
         return
     
     # Get current dataset and description
     current_dataset = st.session_state.datasets[st.session_state.current_dataset_idx]
-    available_descriptions = [d for d in DESCRIPTION_TYPES if d in current_dataset['descriptions']]
+    available_descriptions = [d for d in st.session_state.selected_methods if d in current_dataset['descriptions']]
     
     if not available_descriptions:
         st.error(f"No description files found for {current_dataset['name']}")
@@ -424,7 +502,7 @@ def main():
     with left_col:
         st.subheader("📋 Reference Data")
         
-        # Display dataset title if available - RIGHT HERE UNDER "Reference Data"
+        # Display dataset title if available
         if current_dataset.get('title'):
             st.markdown(f'<div class="title-box">📌 <strong>Dataset Title:</strong> {current_dataset["title"]}</div>', unsafe_allow_html=True)
         
@@ -582,13 +660,13 @@ def main():
                 st.session_state.current_desc_idx -= 1
             elif st.session_state.current_dataset_idx > 0:
                 st.session_state.current_dataset_idx -= 1
-                st.session_state.current_desc_idx = len(DESCRIPTION_TYPES) - 1
+                st.session_state.current_desc_idx = len(st.session_state.selected_methods) - 1
             st.rerun()
     
     with col2:
         # Show completion status
-        total_items = len(st.session_state.datasets) * len(DESCRIPTION_TYPES)
-        current_position = st.session_state.current_dataset_idx * len(DESCRIPTION_TYPES) + st.session_state.current_desc_idx + 1
+        total_items = len(st.session_state.datasets) * len(st.session_state.selected_methods)
+        current_position = st.session_state.current_dataset_idx * len(st.session_state.selected_methods) + st.session_state.current_desc_idx + 1
         st.info(f"Position: {current_position} / {total_items}")
     
     with col3:
